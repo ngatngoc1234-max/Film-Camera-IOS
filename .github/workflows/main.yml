@@ -9,41 +9,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Locate & Build Project
+      - name: Patch Xcode Format & Build
         run: |
-          echo "=== Kiểm tra cấu trúc thư mục ==="
-          find . -maxdepth 3 -not -path '*/.*'
+          PBXPROJ="Film Camera.xcodeproj/project.pbxproj"
           
-          # 1. Nếu dự án dùng XcodeGen (file project.yml) mà chưa có .xcodeproj
-          YAML_FILE=$(find . -name "project.yml" | head -n 1)
-          if [ -n "$YAML_FILE" ]; then
-            cd "$(dirname "$YAML_FILE")"
-            brew install xcodegen || true
-            xcodegen generate
-            cd -
-          fi
-
-          # 2. Quét tìm vị trí chính xác của .xcworkspace hoặc .xcodeproj
-          WORKSPACE=$(find . -maxdepth 3 -name "*.xcworkspace" -not -path "*.xcodeproj/*" | head -n 1)
-          PROJECT=$(find . -maxdepth 3 -name "*.xcodeproj" | head -n 1)
-
-          if [ -n "$WORKSPACE" ]; then
-            DIR=$(dirname "$WORKSPACE")
-            NAME=$(basename "$WORKSPACE")
-            cd "$DIR"
-            SCHEME=$(xcodebuild -workspace "$NAME" -list | awk '/Schemes:/{flag=1; next} flag && NF {print $1; exit}')
-            xcodebuild clean build -workspace "$NAME" -scheme "$SCHEME" -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath "$GITHUB_WORKSPACE/build"
-          elif [ -n "$PROJECT" ]; then
-            DIR=$(dirname "$PROJECT")
-            NAME=$(basename "$PROJECT")
-            cd "$DIR"
-            SCHEME=$(xcodebuild -project "$NAME" -list | awk '/Schemes:/{flag=1; next} flag && NF {print $1; exit}')
-            xcodebuild clean build -project "$NAME" -scheme "$SCHEME" -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath "$GITHUB_WORKSPACE/build"
-          else
-            echo "Không tìm thấy file Xcode project!"
-            exit 1
-          fi
+          echo "=== Hạ cấp định dạng Xcode Project (110 -> 60) ==="
+          sed -i '' 's/objectVersion = 110;/objectVersion = 60;/g' "$PBXPROJ"
+          sed -i '' 's/minimizedProjectReferenceProxies = 1;//g' "$PBXPROJ"
+          sed -i '' 's/preferredProjectObjectVersion = 110;//g' "$PBXPROJ"
           
+          echo "=== Hạ yêu cầu phiên bản iOS xuống 16.0 để tương thích mọi máy ==="
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9]*\.[0-9]*;/IPHONEOS_DEPLOYMENT_TARGET = 16.0;/g' "$PBXPROJ"
+          
+          echo "=== Kiểm tra danh sách Schemes ==="
+          xcodebuild -project "Film Camera.xcodeproj" -list
+          
+          echo "=== Bắt đầu Build ==="
+          xcodebuild clean build \
+            -project "Film Camera.xcodeproj" \
+            -scheme "Film Camera" \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath "$GITHUB_WORKSPACE/build"
+            
       - name: Package IPA
         run: |
           mkdir -p Payload
