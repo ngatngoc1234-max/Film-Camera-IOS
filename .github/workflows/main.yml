@@ -9,14 +9,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build Unsigned App
+      - name: Build Unsigned App (Auto Detect)
         run: |
-          xcodebuild clean build -project "Film Camera.xcodeproj" -scheme "Film Camera" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -sdk iphoneos -derivedDataPath build
+          # Tự động quét tìm tên Scheme chuẩn xác
+          SCHEME=$(xcodebuild -list | grep -A 1 "Schemes:" | tail -n 1 | sed 's/^[ \t]*//;s/[ \t]*$//')
+          echo "Scheme tìm thấy: $SCHEME"
+          
+          # Thực thi lệnh build với Scheme tự động
+          xcodebuild clean build -scheme "$SCHEME" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -sdk iphoneos -derivedDataPath build
           
       - name: Package IPA
         run: |
           mkdir -p Payload
-          mv "build/Build/Products/Debug-iphoneos/Film Camera.app" Payload/ || mv build/Build/Products/*-iphoneos/*.app Payload/
+          # Tự động quét tìm thư mục .app vừa sinh ra để đóng gói
+          find build -type d -name "*.app" -exec cp -R {} Payload/ \;
           zip -r FilmCamera.ipa Payload
           
       - name: Upload IPA Artifact
