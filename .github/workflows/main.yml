@@ -13,18 +13,18 @@ jobs:
         run: |
           PBXPROJ="Film Camera.xcodeproj/project.pbxproj"
           
-          echo "=== Hạ cấp định dạng Xcode Project (110 -> 60) ==="
+          echo "=== 1. Hạ định dạng project (110 -> 60) để Xcode 26.6 đọc được ==="
           sed -i '' 's/objectVersion = 110;/objectVersion = 60;/g' "$PBXPROJ"
           sed -i '' 's/minimizedProjectReferenceProxies = 1;//g' "$PBXPROJ"
           sed -i '' 's/preferredProjectObjectVersion = 110;//g' "$PBXPROJ"
           
-          echo "=== Hạ yêu cầu phiên bản iOS xuống 16.0 để tương thích mọi máy ==="
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9]*\.[0-9]*;/IPHONEOS_DEPLOYMENT_TARGET = 16.0;/g' "$PBXPROJ"
+          echo "=== 2. Đặt target 26.0 khớp với SDK 26.5 của GitHub (chạy nguyên bản trên iOS 27) ==="
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9]*\.[0-9]*;/IPHONEOS_DEPLOYMENT_TARGET = 26.0;/g' "$PBXPROJ"
           
-          echo "=== Kiểm tra danh sách Schemes ==="
-          xcodebuild -project "Film Camera.xcodeproj" -list
+          echo "=== 3. Sửa dòng 24 AdjustmentsSheet giúp trình biên dịch không bị quá tải ==="
+          sed -i '' 's/\$camera.adjustments\[dynamicMember: control.keyPath\]/Bindable(camera).adjustments[dynamicMember: control.keyPath]/g' "Film Camera/Views/Adjustments/AdjustmentsSheet.swift"
           
-          echo "=== Bắt đầu Build ==="
+          echo "=== 4. Bắt đầu Build ==="
           xcodebuild clean build \
             -project "Film Camera.xcodeproj" \
             -scheme "Film Camera" \
