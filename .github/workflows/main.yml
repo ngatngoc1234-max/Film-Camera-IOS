@@ -11,12 +11,12 @@ jobs:
       
       - name: Build Unsigned App
         run: |
-          xcodebuild clean build CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -sdk iphoneos -derivedDataPath build
+          xcodebuild clean build -project "Film Camera.xcodeproj" -scheme "Film Camera" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -sdk iphoneos -derivedDataPath build
           
       - name: Package IPA
         run: |
           mkdir -p Payload
-          mv build/Build/Products/*-iphoneos/*.app Payload/
+          mv "build/Build/Products/Debug-iphoneos/Film Camera.app" Payload/ || mv build/Build/Products/*-iphoneos/*.app Payload/
           zip -r FilmCamera.ipa Payload
           
       - name: Upload IPA Artifact
