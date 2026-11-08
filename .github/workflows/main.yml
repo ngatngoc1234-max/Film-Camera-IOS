@@ -9,20 +9,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build Unsigned App (Auto Detect)
+      - name: Locate & Build Project
         run: |
-          # Tự động quét tìm tên Scheme chuẩn xác
-          SCHEME=$(xcodebuild -list | grep -A 1 "Schemes:" | tail -n 1 | sed 's/^[ \t]*//;s/[ \t]*$//')
-          echo "Scheme tìm thấy: $SCHEME"
+          echo "=== Kiểm tra cấu trúc thư mục ==="
+          find . -maxdepth 3 -not -path '*/.*'
           
-          # Thực thi lệnh build với Scheme tự động
-          xcodebuild clean build -scheme "$SCHEME" CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -sdk iphoneos -derivedDataPath build
+          # 1. Nếu dự án dùng XcodeGen (file project.yml) mà chưa có .xcodeproj
+          YAML_FILE=$(find . -name "project.yml" | head -n 1)
+          if [ -n "$YAML_FILE" ]; then
+            cd "$(dirname "$YAML_FILE")"
+            brew install xcodegen || true
+            xcodegen generate
+            cd -
+          fi
+
+          # 2. Quét tìm vị trí chính xác của .xcworkspace hoặc .xcodeproj
+          WORKSPACE=$(find . -maxdepth 3 -name "*.xcworkspace" -not -path "*.xcodeproj/*" | head -n 1)
+          PROJECT=$(find . -maxdepth 3 -name "*.xcodeproj" | head -n 1)
+
+          if [ -n "$WORKSPACE" ]; then
+            DIR=$(dirname "$WORKSPACE")
+            NAME=$(basename "$WORKSPACE")
+            cd "$DIR"
+            SCHEME=$(xcodebuild -workspace "$NAME" -list | awk '/Schemes:/{flag=1; next} flag && NF {print $1; exit}')
+            xcodebuild clean build -workspace "$NAME" -scheme "$SCHEME" -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath "$GITHUB_WORKSPACE/build"
+          elif [ -n "$PROJECT" ]; then
+            DIR=$(dirname "$PROJECT")
+            NAME=$(basename "$PROJECT")
+            cd "$DIR"
+            SCHEME=$(xcodebuild -project "$NAME" -list | awk '/Schemes:/{flag=1; next} flag && NF {print $1; exit}')
+            xcodebuild clean build -project "$NAME" -scheme "$SCHEME" -sdk iphoneos -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath "$GITHUB_WORKSPACE/build"
+          else
+            echo "Không tìm thấy file Xcode project!"
+            exit 1
+          fi
           
       - name: Package IPA
         run: |
           mkdir -p Payload
-          # Tự động quét tìm thư mục .app vừa sinh ra để đóng gói
-          find build -type d -name "*.app" -exec cp -R {} Payload/ \;
+          APP_PATH=$(find "$GITHUB_WORKSPACE/build" -type d -name "*.app" | head -n 1)
+          echo "Đóng gói file: $APP_PATH"
+          cp -R "$APP_PATH" Payload/
           zip -r FilmCamera.ipa Payload
           
       - name: Upload IPA Artifact
